@@ -92,25 +92,26 @@ class MyViewModel: ViewModel() {
         }
 
     }
+    private val apiKey :String ="" 
     private var accounts:MutableList<Account> = mutableListOf()
     private var transactions:MutableList<Transaction> = mutableListOf()
     private var categories:MutableList<Category> = mutableListOf()
 
-    suspend fun massPopulate() = withContext(Dispatchers.Default){
-        populateAccounts()
+    suspend fun massPopulate(apiKey:String) = withContext(Dispatchers.Default){
+        populateAccounts(apiKey)
         Log.e("accounts", "finished accounts")
-        populateTransactions()
+        populateTransactions(apiKey)
         Log.e("status", "finished transactions")
         populateCategories()
         Log.e("status", "finished categories")
     }
-    suspend fun populateAccounts() = withContext(Dispatchers.Default) {
+    suspend fun populateAccounts(apiKey:String) = withContext(Dispatchers.Default) {
         // Heavy work
         val getAccount = URL("https://api.up.com.au/api/v1/accounts")
         val http: HttpURLConnection = getAccount.openConnection() as HttpURLConnection
         http.setRequestProperty(
             "Authorization",
-            "Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
+            "Bearer "+apiKey
         )
         try {
             val result = http.content as InputStream
@@ -145,13 +146,13 @@ class MyViewModel: ViewModel() {
             http.disconnect()
         }
     }
-    suspend fun populateTransactions() = withContext(Dispatchers.Default) {
+    suspend fun populateTransactions(apiKey:String) = withContext(Dispatchers.Default) {
         // Heavy work
         val getAccount = URL("https://api.up.com.au/api/v1/transactions")
         val http: HttpURLConnection = getAccount.openConnection() as HttpURLConnection
         http.setRequestProperty(
             "Authorization",
-            "Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
+            "Bearer "+apiKey
         )
         try {
             val result = http.content as InputStream
