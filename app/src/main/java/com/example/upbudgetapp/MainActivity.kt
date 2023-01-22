@@ -45,15 +45,15 @@ import java.net.URL
 
 
 interface UpApi {
-    @Headers("Authorization: Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3")
+    //@Headers("Authorization: Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3")
     @GET("/api/v1/accounts")
-    suspend fun getAccounts() : Response<Any>
-    @Headers("Authorization: Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3")
+    suspend fun getAccounts(@HeaderMap headers:Map<String, String>) : Response<Any>
+    //@Headers("Authorization: Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3")
     @GET("/api/v1/transactions")
-    suspend fun getTransactions() : Response<Any>
+    suspend fun getTransactions(@HeaderMap headers:Map<String, String>) : Response<Any>
     //@Headers("Authorisation:Bearer up:yeah:404")
     @GET("/api/v1/util/ping")
-    suspend fun ping(@HeaderMap headers:Map<String, String>/*("Authorisation"/*:Bearerup:yeah:404"*/) head:String*/) : Response<Any>
+    suspend fun ping(@HeaderMap headers:Map<String, String>) : Response<Any>
 
 }
 
@@ -83,7 +83,7 @@ class MainActivity : ComponentActivity() {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
-        val savedKey = sharedPreferences.getString("apikey", "up:yeah:404")
+        val savedKey = "up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"//sharedPreferences.getString("apikey", "up:yeah:404")
         setContent {
             UpBudgetAppTheme {
                 // A surface container using the 'background' color from the theme
@@ -137,8 +137,9 @@ class BufferViewModel : ViewModel {
 
     constructor(passedKey: String) : super() {
         viewModelScope.launch {
-            initialise(passedKey)
             savedKey=passedKey
+            initialise(passedKey)
+
 
 
             Log.e("response code", responseCode.toString())
@@ -245,14 +246,13 @@ class LoginViewModel : ViewModel {
     }
 }
 
-class MyViewModel: ViewModel(){
-    init {
+class MyViewModel: ViewModel{
+    constructor(passedKey: String) : super() {
         viewModelScope.launch {
             Log.e("mainViewmodel started", "HERE")
             // Coroutine that will be canceled when the ViewModel is cleared.
-            massPopulate()
+            massPopulate(passedKey)
         }
-
     }
     private var accounts:MutableList<Account> = mutableListOf()
     private var transactions:MutableList<Transaction> = mutableListOf()
@@ -261,23 +261,26 @@ class MyViewModel: ViewModel(){
     private var responseCode=0
 
 
-    suspend fun massPopulate() = withContext(Dispatchers.Default){
-        populateAccounts() // old method, works fine
-        //populateAccounts2() //retrofit method - doesnt work by its self
+    suspend fun massPopulate(passedKey:String) = withContext(Dispatchers.Default){
+        Log.e("populate started", "HERE")
+        Log.d("passed Key populate ", passedKey)
+        populateAccounts(passedKey) // old method, works fine
+        //populateAccounts2(passedKey) //retrofit method - doesnt work by its self
         Log.e("accounts", "finished accounts")
         //populateTransactions() //old method, no longer needed, not going to delete till retrofit is 100%
-        populateTransactions2() //retrofit method, works
+        populateTransactions2(passedKey) //retrofit method, works
         Log.e("status", "finished transactions")
         populateCategories()
         Log.e("status", "finished categories")
     }
-    suspend fun populateAccounts() = withContext(Dispatchers.Default) {
+    suspend fun populateAccounts(passedKey:String) = withContext(Dispatchers.Default) {
         // Heavy work
+        Log.d("passed Key accounts ", passedKey)
         val getAccount = URL("https://api.up.com.au/api/v1/accounts")
         val http: HttpURLConnection = getAccount.openConnection() as HttpURLConnection
         http.setRequestProperty(
             "Authorization",
-            "Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
+            "Bearer $passedKey"//up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
         )
         try {
             val result = http.content as InputStream
@@ -316,8 +319,10 @@ class MyViewModel: ViewModel(){
 
     }
 
-    suspend fun populateAccounts2() = withContext(Dispatchers.Default){
-        val accountsx = upApi.getAccounts()
+    suspend fun populateAccounts2(passedKey:String) = withContext(Dispatchers.Default){
+        val map = HashMap<String, String>()
+        map["Authorization"] = passedKey
+        val accountsx = upApi.getAccounts(map)
         val delimiter = "}, {type=accounts,"
         val delimiter2 = "data=[{type=accounts,"
         val delimiter3 = "}}],"
@@ -388,9 +393,13 @@ class MyViewModel: ViewModel(){
         }
     }
 
-    suspend fun populateTransactions2() = withContext(Dispatchers.Default) {
+    suspend fun populateTransactions2(passedKey:String) = withContext(Dispatchers.Default) {
         // Heavy work
-        val transactionsx = upApi.getTransactions()
+        Log.d("passed Key transactions ", passedKey)
+        val map = HashMap<String, String>()
+        map["Authorization"] = "Bearer "+passedKey//"Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
+        Log.d("map transactions ", map.toString())
+        val transactionsx = upApi.getTransactions(map)
         Log.e("working head", transactionsx.body().toString())
         val delimiter = "}, {type=transactions,"
         val delimiter2 = "data=[{type=transactions,"
@@ -721,7 +730,7 @@ fun buffer(viewModel: BufferViewModel = viewModel()){
     Log.e("started buffer", "HERE")
     while(viewModel.getStatus()==0)Thread.sleep(10)
     if(viewModel.getStatus()==200){
-        HomeScreen()//todo pass key
+        HomeScreen(MyViewModel(viewModel.getKey()))
     }
     else loginCard()
     val upApi: UpApi = RetrofitHelper.getInstance().create(UpApi::class.java)
@@ -754,7 +763,7 @@ fun HomeScreen(viewModel: MyViewModel = viewModel()) {
 }
 
 @Composable
-fun loginCard(viewModel:LoginViewModel = viewModel()) {
+fun loginCard() {
     val coroutineScope = rememberCoroutineScope()
     val upApi: UpApi = RetrofitHelper.getInstance().create(UpApi::class.java)
     var responseCode=0
