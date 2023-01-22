@@ -32,9 +32,12 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.upbudgetapp.ui.theme.UpBudgetAppTheme
 import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.create
 import retrofit2.http.GET
 import retrofit2.http.HeaderMap
 import retrofit2.http.Headers
@@ -59,14 +62,21 @@ interface UpApi {
 
 object RetrofitHelper {
 
-    val baseUrl = "https://api.up.com.au/api/v1/"
+    const val baseUrl = "https://api.up.com.au/api/v1/"
 
-    fun getInstance(): Retrofit {
-        return Retrofit.Builder().baseUrl(baseUrl)
+    val instance: UpApi by lazy {
+        Retrofit.Builder().baseUrl(baseUrl)
             .addConverterFactory(GsonConverterFactory.create())
+            .client(
+                OkHttpClient.Builder()
+                .addInterceptor(UpAuth)
+                .addInterceptor(HttpLoggingInterceptor())
+                .build()
+            )
             // we need to add converter factory to
             // convert JSON object to Java object
             .build()
+            .create()
     }
 }
 
@@ -133,9 +143,12 @@ data class Passthrough(
     var currentAccount:String
 )
 
-class BufferViewModel : ViewModel {
+class BufferViewModel(passedKey: String) : ViewModel() {
 
-    constructor(passedKey: String) : super() {
+    private var savedKey = ""
+    private var responseCode=0
+    private val upApi: UpApi
+    init {
         viewModelScope.launch {
             savedKey=passedKey
             initialise(passedKey)
@@ -145,11 +158,9 @@ class BufferViewModel : ViewModel {
             Log.e("response code", responseCode.toString())
 
         }
-        this.upApi = RetrofitHelper.getInstance().create(UpApi::class.java)
+        this.upApi = RetrofitHelper.instance
     }
-    private var savedKey = ""
-    private var responseCode=0
-    private val upApi: UpApi
+
     private suspend fun initialise(passedKey:String) = withContext(Dispatchers.Default) {
         // Heavy work]
         val getAccount = URL("https://api.up.com.au/api/v1/util/ping")
@@ -190,9 +201,13 @@ class BufferViewModel : ViewModel {
     }
 }
 
-class LoginViewModel : ViewModel {
+class LoginViewModel(passedKey: String) : ViewModel() {
 
-    constructor(passedKey: String) : super() {
+    private var savedKey = ""
+    private var responseCode=0
+    private val upApi: UpApi
+
+    init {
         viewModelScope.launch {
             initialise(passedKey)
             savedKey=passedKey
@@ -201,11 +216,9 @@ class LoginViewModel : ViewModel {
             Log.e("response code", responseCode.toString())
 
         }
-        this.upApi = RetrofitHelper.getInstance().create(UpApi::class.java)
+        this.upApi = RetrofitHelper.instance
     }
-    private var savedKey = ""
-    private var responseCode=0
-    private val upApi: UpApi
+
     private suspend fun initialise(passedKey:String) = withContext(Dispatchers.Default) {
         // Heavy work]
         val getAccount = URL("https://api.up.com.au/api/v1/util/ping")
@@ -257,7 +270,9 @@ class MyViewModel: ViewModel{
     private var accounts:MutableList<Account> = mutableListOf()
     private var transactions:MutableList<Transaction> = mutableListOf()
     private var categories:MutableList<Category> = mutableListOf()
-    private val upApi: UpApi = RetrofitHelper.getInstance().create(UpApi::class.java)
+    private val upApi: UpApi by lazy {
+      RetrofitHelper.instance
+    }
     private var responseCode=0
 
 
@@ -733,7 +748,7 @@ fun buffer(viewModel: BufferViewModel = viewModel()){
         HomeScreen(MyViewModel(viewModel.getKey()))
     }
     else loginCard()
-    val upApi: UpApi = RetrofitHelper.getInstance().create(UpApi::class.java)
+    val upApi: UpApi = RetrofitHelper.instance
     Thread.sleep(3000)
 
     //Thread.sleep(1000)
@@ -765,19 +780,20 @@ fun HomeScreen(viewModel: MyViewModel = viewModel()) {
 @Composable
 fun loginCard() {
     val coroutineScope = rememberCoroutineScope()
-    val upApi: UpApi = RetrofitHelper.getInstance().create(UpApi::class.java)
-    var responseCode=0
+//    Never put API calls inside a UI composable
+//    val upApi: UpApi = RetrofitHelper.getInstance().create(UpApi::class.java)
+//    var responseCode=0
     var state =  TextFieldValue("")
-    val loginOnClick: () -> Unit = {
-        coroutineScope.launch {
-            //responseCode = upApi.ping("Authorisation: Bearer ${state.toString()}").code()
-        }
-        if(responseCode==200){
-            /*with(prefs.edit()){
-                putString("apiKey", state.toString())
-            }*/
-        }
-    }
+//    val loginOnClick: () -> Unit = {
+//        coroutineScope.launch {
+//            //responseCode = upApi.ping("Authorisation: Bearer ${state.toString()}").code()
+//        }
+//        if(responseCode==200){
+//            /*with(prefs.edit()){
+//                putString("apiKey", state.toString())
+//            }*/
+//        }
+//    }
     Column{
 
         Text("Enter your api key")
@@ -786,7 +802,7 @@ fun loginCard() {
             onValueChange = {value-> state= value  }
         )
         //Text("The textfield has this text: "+state)
-        Button(onClick = {loginOnClick}){
+        Button(onClick = {}){
             Text("submit")
         }
 
