@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">UpBudgetApp</string>
+    <string name="title_activity_login">loginActivity</string>
 </resources>

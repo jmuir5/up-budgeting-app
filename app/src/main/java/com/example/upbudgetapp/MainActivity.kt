@@ -1,5 +1,6 @@
 package com.example.upbudgetapp
 
+import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -19,22 +22,68 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.upbudgetapp.ui.theme.UpBudgetAppTheme
-import java.net.HttpURLConnection
-import java.net.URL
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import com.example.upbudgetapp.ui.theme.UpBudgetAppTheme
 import kotlinx.coroutines.*
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.GET
+import retrofit2.http.HeaderMap
+import retrofit2.http.Headers
 import java.io.BufferedReader
 import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
+
+interface UpApi {
+    @Headers("Authorization: Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3")
+    @GET("/api/v1/accounts")
+    suspend fun getAccounts() : Response<Any>
+    @Headers("Authorization: Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3")
+    @GET("/api/v1/transactions")
+    suspend fun getTransactions() : Response<Any>
+    //@Headers("Authorisation:Bearer up:yeah:404")
+    @GET("/api/v1/util/ping")
+    suspend fun ping(@HeaderMap headers:Map<String, String>/*("Authorisation"/*:Bearerup:yeah:404"*/) head:String*/) : Response<Any>
+
+}
+
+object RetrofitHelper {
+
+    val baseUrl = "https://api.up.com.au/api/v1/"
+
+    fun getInstance(): Retrofit {
+        return Retrofit.Builder().baseUrl(baseUrl)
+            .addConverterFactory(GsonConverterFactory.create())
+            // we need to add converter factory to
+            // convert JSON object to Java object
+            .build()
+    }
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val masterKey = MasterKey.Builder(this)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+
+        val sharedPreferences: SharedPreferences = EncryptedSharedPreferences.create(this,
+            "secret_shared_prefs",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+        val savedKey = sharedPreferences.getString("apikey", "up:yeah:404")
         setContent {
             UpBudgetAppTheme {
                 // A surface container using the 'background' color from the theme
@@ -42,8 +91,8 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-
-                    HomeScreen()
+                    buffer(BufferViewModel(savedKey!!))
+                    //HomeScreen()
 
                 }
             }
@@ -84,9 +133,122 @@ data class Passthrough(
     var currentAccount:String
 )
 
-class MyViewModel: ViewModel() {
+class BufferViewModel : ViewModel {
+
+    constructor(passedKey: String) : super() {
+        viewModelScope.launch {
+            initialise(passedKey)
+            savedKey=passedKey
+
+
+            Log.e("response code", responseCode.toString())
+
+        }
+        this.upApi = RetrofitHelper.getInstance().create(UpApi::class.java)
+    }
+    private var savedKey = ""
+    private var responseCode=0
+    private val upApi: UpApi
+    private suspend fun initialise(passedKey:String) = withContext(Dispatchers.Default) {
+        // Heavy work]
+        val getAccount = URL("https://api.up.com.au/api/v1/util/ping")
+        val http: HttpURLConnection = getAccount.openConnection() as HttpURLConnection
+        http.setRequestProperty(
+            "Authorization",
+            "Bearer "+passedKey//up:yeah:GFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"//up:yeah:404"
+        )
+        try {
+            responseCode = http.responseCode.toInt()
+        } finally {
+            http.disconnect()
+        }
+    }
+
+    suspend fun attemptLogin(apiKey:String):Int = withContext(Dispatchers.IO){
+        Log.e("concurrent responseCode before", responseCode.toString())
+        Log.e("head", "Authorisation: Bearer $apiKey")
+        val map = HashMap<String, String>()
+        map["Authorization"] = "Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
+        Log.e("map",  map.toString())
+
+        val pingtest = async{
+            Log.e("request", upApi.ping(map/*"Authorisation: Bearer $apiKey"*/).headers().toString())
+            responseCode=upApi.ping(map/*"Bearer $apiKey"*/).code() }
+        pingtest.await()
+        Log.e("concurrent responseCode after", responseCode.toString())
+
+        responseCode
+
+
+    }
+    fun getStatus():Int{
+        return responseCode
+    }
+    fun getKey():String{
+        return savedKey
+    }
+}
+
+class LoginViewModel : ViewModel {
+
+    constructor(passedKey: String) : super() {
+        viewModelScope.launch {
+            initialise(passedKey)
+            savedKey=passedKey
+
+
+            Log.e("response code", responseCode.toString())
+
+        }
+        this.upApi = RetrofitHelper.getInstance().create(UpApi::class.java)
+    }
+    private var savedKey = ""
+    private var responseCode=0
+    private val upApi: UpApi
+    private suspend fun initialise(passedKey:String) = withContext(Dispatchers.Default) {
+        // Heavy work]
+        val getAccount = URL("https://api.up.com.au/api/v1/util/ping")
+        val http: HttpURLConnection = getAccount.openConnection() as HttpURLConnection
+        http.setRequestProperty(
+            "Authorization",
+            "Bearer "+passedKey//up:yeah:GFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"//up:yeah:404"
+        )
+        try {
+            responseCode = http.responseCode.toInt()
+        } finally {
+            http.disconnect()
+        }
+    }
+
+    suspend fun attemptLogin(apiKey:String):Int = withContext(Dispatchers.IO){
+        Log.e("concurrent responseCode before", responseCode.toString())
+        Log.e("head", "Authorisation: Bearer $apiKey")
+        val map = HashMap<String, String>()
+        map["Authorization"] = "Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
+        Log.e("map",  map.toString())
+
+        val pingtest = async{
+            Log.e("request", upApi.ping(map/*"Authorisation: Bearer $apiKey"*/).headers().toString())
+            responseCode=upApi.ping(map/*"Bearer $apiKey"*/).code() }
+        pingtest.await()
+        Log.e("concurrent responseCode after", responseCode.toString())
+
+        responseCode
+
+
+    }
+    fun getStatus():Int{
+        return responseCode
+    }
+    fun getKey():String{
+        return savedKey
+    }
+}
+
+class MyViewModel: ViewModel(){
     init {
         viewModelScope.launch {
+            Log.e("mainViewmodel started", "HERE")
             // Coroutine that will be canceled when the ViewModel is cleared.
             massPopulate()
         }
@@ -95,11 +257,16 @@ class MyViewModel: ViewModel() {
     private var accounts:MutableList<Account> = mutableListOf()
     private var transactions:MutableList<Transaction> = mutableListOf()
     private var categories:MutableList<Category> = mutableListOf()
+    private val upApi: UpApi = RetrofitHelper.getInstance().create(UpApi::class.java)
+    private var responseCode=0
+
 
     suspend fun massPopulate() = withContext(Dispatchers.Default){
-        populateAccounts()
+        populateAccounts() // old method, works fine
+        //populateAccounts2() //retrofit method - doesnt work by its self
         Log.e("accounts", "finished accounts")
-        populateTransactions()
+        //populateTransactions() //old method, no longer needed, not going to delete till retrofit is 100%
+        populateTransactions2() //retrofit method, works
         Log.e("status", "finished transactions")
         populateCategories()
         Log.e("status", "finished categories")
@@ -121,14 +288,15 @@ class MyViewModel: ViewModel() {
             } finally {
                 resultReader.close()
             }
+
             val delimiter = "},{\"type\":\"accounts\","
             val delimiter2 = "\"data\":[{\"type\":\"accounts\","
             val delimiter3 = "}}],"
             val parts = content.split(delimiter, delimiter2, delimiter3)
+            Log.d("XXXapi result: ", parts.toString())
+
             for(i in parts) {
                 if (i.startsWith("\"id\":")) {
-                    Log.e("response code", http.getResponseCode().toString())
-                    Log.e("response body", content)
                     accounts.add(
                         Account(
                             getId(i),
@@ -144,6 +312,31 @@ class MyViewModel: ViewModel() {
         }finally {
             http.disconnect()
         }
+
+
+    }
+
+    suspend fun populateAccounts2() = withContext(Dispatchers.Default){
+        val accountsx = upApi.getAccounts()
+        val delimiter = "}, {type=accounts,"
+        val delimiter2 = "data=[{type=accounts,"
+        val delimiter3 = "}}],"
+        val parts = accountsx.body().toString().split(delimiter, delimiter2, delimiter3)
+        for(i in parts) {
+            if (i.startsWith(" id=")) {
+                accounts.add(
+                    Account(
+                        getId2(i),
+                        getAccountName2(i),
+                        getAccountBalance2(i),
+                        getAccountCurrency2(i)
+                    )
+                )
+                Log.e("processed accounts2", accounts.toString())
+                Log.e("processed accounts2", accounts.size.toString())
+            }
+        }
+
     }
     suspend fun populateTransactions() = withContext(Dispatchers.Default) {
         // Heavy work
@@ -166,6 +359,8 @@ class MyViewModel: ViewModel() {
             val delimiter2 = "\"data\":[{\"type\":\"transactions\","
             val delimiter3 = "}}],"
             val parts = content.split(delimiter, delimiter2, delimiter3)
+            Log.d("xxxapi result", parts.toString())//.getResponseCode().toString())
+
             Log.e("response code", http.getResponseCode().toString())
             Log.e("response body", content)
             for(i in parts) {
@@ -191,6 +386,37 @@ class MyViewModel: ViewModel() {
         }finally {
             http.disconnect()
         }
+    }
+
+    suspend fun populateTransactions2() = withContext(Dispatchers.Default) {
+        // Heavy work
+        val transactionsx = upApi.getTransactions()
+        Log.e("working head", transactionsx.body().toString())
+        val delimiter = "}, {type=transactions,"
+        val delimiter2 = "data=[{type=transactions,"
+        val delimiter3 = "}}],"
+        val parts = transactionsx.body().toString().split(delimiter, delimiter2, delimiter3)
+        for(i in parts) {
+            if(i.startsWith(" id=")) {
+                transactions.add(
+                    Transaction(
+                        getId2(i),
+                        getTransactionAmount2(i),
+                        getTransactionCurrency2(i),
+                        getTransactionPayee2(i),
+                        getTransactionPayeeL2(i),
+                        getTransactionDesc2(i),
+                        getAccountId2(i),
+                        getTransactionCategory2(i),
+                        getTransactionParentCategory2(i),
+                        getTransactionTags2(i)
+                    )
+                )
+            }
+        }
+        Log.e("processed transactions", transactions.toString())
+        Log.e("processed transactions", transactions.size.toString())
+
     }
 
     fun populateCategories(){
@@ -272,6 +498,35 @@ class MyViewModel: ViewModel() {
         delimiter = "\""
         return parts[1].split(delimiter)[0]
     }
+
+    fun getId2(content:String): String {
+        var delimiter = "id="
+        val parts = content.split(delimiter)
+        delimiter = ","
+
+        return parts[1].split(delimiter)[0]
+    }
+    fun getAccountName2(content:String): String {
+        var delimiter = "displayName="
+        val parts = content.split(delimiter)
+        delimiter = ","
+
+        return parts[1].split(delimiter)[0]
+    }
+    fun getAccountBalance2(content:String): Float {
+        var delimiter = "valueInBaseUnits="
+        val parts = content.split(delimiter)
+        delimiter = ".0}"
+        return parts[1].split(delimiter)[0].toFloat()
+    }
+    fun getAccountCurrency2(content:String): String {
+        var delimiter = "currencyCode="
+        val parts = content.split(delimiter)
+        delimiter = ","
+
+        return parts[1].split(delimiter)[0]
+    }
+
     fun getTransactionAmount(content:String): Float {
         var delimiter = "\"amount\":"
         var parts = content.split(delimiter)
@@ -360,6 +615,96 @@ class MyViewModel: ViewModel() {
         return tagList.toList()
     }
 
+    fun getTransactionAmount2(content:String): Float {
+        var delimiter = "amount="
+        var parts = content.split(delimiter)
+        delimiter = "valueInBaseUnits="
+        parts = parts[1].split(delimiter)
+        delimiter = ".0}"
+        return parts[1].split(delimiter)[0].toFloat()
+    }
+    fun getTransactionCurrency2(content:String): String {
+        var delimiter = "amount="
+        var parts = content.split(delimiter)
+        delimiter = "currencyCode="
+        parts = parts[1].split(delimiter)
+        delimiter = ","
+        return parts[1].split(delimiter)[0]
+    }
+    fun getTransactionPayee2(content:String): String {
+        var delimiter = "attributes={"
+        var parts = content.split(delimiter)
+        delimiter = "description="
+        parts = parts[1].split(delimiter)
+        if(parts[1].startsWith("null"))return "null"
+        delimiter = ","
+        return parts[1].split(delimiter)[0]
+    }
+    fun getTransactionPayeeL2(content:String): String {
+        var delimiter = "attributes={"
+        var parts = content.split(delimiter)
+        delimiter = "rawText="
+        parts = parts[1].split(delimiter)
+        if(parts[1].startsWith("null"))return "null"
+        delimiter = ","
+        return parts[1].split(delimiter)[0]
+    }
+    fun getTransactionDesc2(content:String): String {
+        var delimiter = "attributes={"
+        var parts = content.split(delimiter)
+        //for(i in parts)Log.e("desc", i)
+        delimiter = "message="
+        parts = parts[1].split(delimiter)
+        //for(i in parts)Log.e("transaction", i)
+        if(parts[1].startsWith("null"))return "null"
+        delimiter = ","
+        return parts[1].split(delimiter)[0]
+    }
+    fun getAccountId2(content:String): String {
+        var delimiter = "account="
+        var parts = content.split(delimiter)
+        delimiter = "id="
+        parts = parts[1].split(delimiter)
+        delimiter = "}"
+        return parts[1].split(delimiter)[0]
+    }
+    fun getTransactionCategory2(content:String): String {
+        var delimiter = "category={data="
+        var parts = content.split(delimiter)
+        if(parts[1].startsWith("null"))return "null"
+        delimiter = "id="
+        parts = parts[1].split(delimiter)
+        delimiter = "}"
+        return parts[1].split(delimiter)[0]
+    }
+    fun getTransactionParentCategory2(content:String): String {
+        var delimiter = "parentCategory={data="
+        var parts = content.split(delimiter)
+        if(parts[1].startsWith("null"))return "null"
+        delimiter = "id="
+        parts = parts[1].split(delimiter)
+        delimiter = "}"
+        return parts[1].split(delimiter)[0]
+    }
+    fun getTransactionTags2(content:String): List<String> {
+        var delimiter = "tags={data=["
+        var delimiter2 = "}],links"
+        var parts = content.split(delimiter, delimiter2)
+        if(parts[1].startsWith("]"))return listOf("null")
+        delimiter = "},{"
+        parts = parts[1].split(delimiter)
+        val tagList = mutableListOf<String>()
+        for (i in parts){
+            delimiter = "id="
+            val tagH= i.split(delimiter)
+            delimiter = "}"
+            delimiter2 = ","
+            tagList.add(tagH[1].split(delimiter, delimiter2)[0])
+        }
+
+        return tagList.toList()
+    }
+
     fun getAccounts():MutableList<Account>{
         return accounts
     }
@@ -372,6 +717,31 @@ class MyViewModel: ViewModel() {
 }
 
 @Composable
+fun buffer(viewModel: BufferViewModel = viewModel()){
+    Log.e("started buffer", "HERE")
+    while(viewModel.getStatus()==0)Thread.sleep(10)
+    if(viewModel.getStatus()==200){
+        HomeScreen()//todo pass key
+    }
+    else loginCard()
+    val upApi: UpApi = RetrofitHelper.getInstance().create(UpApi::class.java)
+    Thread.sleep(3000)
+
+    //Thread.sleep(1000)
+
+    /*while (responseCode==0){
+        Log.e("status", "waiting for login status")
+        Thread.sleep(1000)
+    }*/
+
+    // use the shared preferences and editor as you normally would
+
+    // use the shared preferences and editor as you normally would
+
+
+}
+
+@Composable
 fun HomeScreen(viewModel: MyViewModel = viewModel()) {
     while(viewModel.getCategories().size==0)Thread.sleep(10)
     val passthrough = Passthrough(viewModel.getAccounts().toList(), viewModel.getTransactions().toList(), viewModel.getCategories().toList(), "")
@@ -380,6 +750,37 @@ fun HomeScreen(viewModel: MyViewModel = viewModel()) {
             HeaderCard(account, passthrough)
             Spacer(modifier = Modifier.width(8.dp))
         }
+    }
+}
+
+@Composable
+fun loginCard(viewModel:LoginViewModel = viewModel()) {
+    val coroutineScope = rememberCoroutineScope()
+    val upApi: UpApi = RetrofitHelper.getInstance().create(UpApi::class.java)
+    var responseCode=0
+    var state =  TextFieldValue("")
+    val loginOnClick: () -> Unit = {
+        coroutineScope.launch {
+            //responseCode = upApi.ping("Authorisation: Bearer ${state.toString()}").code()
+        }
+        if(responseCode==200){
+            /*with(prefs.edit()){
+                putString("apiKey", state.toString())
+            }*/
+        }
+    }
+    Column{
+
+        Text("Enter your api key")
+        BasicTextField(
+            value = state,
+            onValueChange = {value-> state= value  }
+        )
+        //Text("The textfield has this text: "+state)
+        Button(onClick = {loginOnClick}){
+            Text("submit")
+        }
+
     }
 }
 
@@ -434,7 +835,6 @@ fun HeaderCard(info:Account, passthrough:Passthrough){
     }
 }
 
-
 @Composable
 fun CategoryCard(info:Category, passthrough:Passthrough, level:Int){
     val pad = 16+(level*8)
@@ -442,7 +842,8 @@ fun CategoryCard(info:Category, passthrough:Passthrough, level:Int){
     Column() {
         var isExpanded by remember { mutableStateOf(false) }
         Row(modifier = Modifier
-            .padding(all = 8.dp).padding(start = pad.dp)
+            .padding(all = 8.dp)
+            .padding(start = pad.dp)
             .clickable { isExpanded = !isExpanded }) {
             Image(
                 painter = painterResource(R.drawable.profile_picture),
@@ -501,7 +902,8 @@ fun TransactionCard(info:Transaction, passthrough:Passthrough, level:Int){
     Column() {
         var isExpanded by remember { mutableStateOf(false) }
         Row(modifier = Modifier
-            .padding(all = 8.dp).padding(start=pad.dp)
+            .padding(all = 8.dp)
+            .padding(start = pad.dp)
             .clickable { isExpanded = !isExpanded }) {
             Image(
                 painter = painterResource(R.drawable.profile_picture),
@@ -610,6 +1012,13 @@ fun Conversation(messages: List<Message>) {
             GreetingCard(message)
         }
     }
+}
+
+
+suspend fun login(prefs:SharedPreferences, input:String, response:Int) = withContext(Dispatchers.Default){
+
+
+
 }
 
 @Preview(name="light mode",
