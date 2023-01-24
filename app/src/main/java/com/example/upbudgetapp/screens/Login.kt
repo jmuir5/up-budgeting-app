@@ -30,15 +30,20 @@ import kotlinx.coroutines.launch
 
 
 @Composable
-fun loginCard(viewModel: LoginViewModel = viewModel(), prefs: SharedPreferences, navController:NavHostController) {
+fun loginCard(
+    viewModel: LoginViewModel = viewModel(),
+    prefs: SharedPreferences,
+    navController: NavHostController
+) {
     val coroutineScope = rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
     var response by remember { mutableStateOf(0) }
     var clicked by remember { mutableStateOf(false) }
     Column(
-        modifier=Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
-        horizontalAlignment = CenterHorizontally){
+        horizontalAlignment = CenterHorizontally
+    ) {
 
         Image(
             painter = painterResource(R.drawable.shit_up_logo),
@@ -53,39 +58,39 @@ fun loginCard(viewModel: LoginViewModel = viewModel(), prefs: SharedPreferences,
         Text("Enter your api key")
         TextField(
             value = text,
-            onValueChange = {text=it },
-            label={ Text("Paste your api key here") })
+            onValueChange = { text = it },
+            label = { Text("Paste your api key here") })
 
         //Text("The textfield has this text: "+state)
         Button(
             onClick = {
-                response=0
+                response = 0
                 viewModel.setStatus(0)
-                clicked=false
-                coroutineScope.launch {viewModel.attemptLogin(text.toString())}
+                clicked = false
+                coroutineScope.launch { viewModel.attemptLogin(text.toString()) }
 
-                clicked=true
+                clicked = true
 
-            }){//LaunchedEffect(true){viewModel.attemptLogin(state.toString())}){
+            }) {//LaunchedEffect(true){viewModel.attemptLogin(state.toString())}){
             Text("submit")
 
         }
         //
-        if(clicked==true){
-            while(viewModel.getStatus()==0)Thread.sleep(10)
-            response=viewModel.getStatus()
-            if(response==200){
+        if (clicked == true) {
+            while (viewModel.getStatus() == 0) Thread.sleep(10)
+            response = viewModel.getStatus()
+            if (response == 200) {
                 prefs.edit().putString("apiKey", text.toString()).apply()
-                navController.navigate(Paths.Home.Path+"/${text}"){
-                    popUpTo(Paths.Login.Path){
-                        inclusive=true
+                navController.navigate(Paths.Home.Path + "/${text}") {
+                    popUpTo(Paths.Login.Path) {
+                        inclusive = true
                     }
                     //HomeScreen(MainViewModel(text.toString()))
                 }
-                clicked=false
+                clicked = false
 
 
-            }else if(response==401){
+            } else if (response == 401) {
                 Text("Your Api Key failed to authenticate")
             }
 

@@ -1,5 +1,6 @@
 package com.example.upbudgetapp
 
+import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.os.Bundle
@@ -23,18 +24,22 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navOptions
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.upbudgetapp.screens.HomeScreen
 import com.example.upbudgetapp.screens.loginCard
 import com.example.upbudgetapp.ui.theme.UpBudgetAppTheme
 import kotlinx.coroutines.*
+import kotlinx.serialization.Serializable
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
@@ -48,56 +53,39 @@ import java.io.BufferedReader
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.time.Duration.Companion.seconds
 
+class AuthStore private constructor(context: Context) {
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
 
-interface UpApi {
-    //@Headers("Authorization: Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3")
-    @GET("/api/v1/accounts")
-    suspend fun getAccounts(@HeaderMap headers:Map<String, String>) : Response<Any>
-    //@Headers("Authorization: Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3")
-    @GET("/api/v1/transactions")
-    suspend fun getTransactions(@HeaderMap headers:Map<String, String>) : Response<Any>
-    //@Headers("Authorisation:Bearer up:yeah:404")
-    @GET("/api/v1/util/ping")
-    suspend fun ping(@HeaderMap headers:Map<String, String>) : Response<Any>
+    val prefs: SharedPreferences = EncryptedSharedPreferences.create(
+        context,
+        "secret_shared_prefs",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
 
-}
+    companion object {
+        lateinit var instance: AuthStore
 
-object RetrofitHelper {
-
-    const val baseUrl = "https://api.up.com.au/api/v1/"
-
-    val instance: UpApi by lazy {
-        Retrofit.Builder().baseUrl(baseUrl)
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(
-                OkHttpClient.Builder()
-                .addInterceptor(UpAuth)
-                .addInterceptor(HttpLoggingInterceptor())
-                .build()
-            )
-            // we need to add converter factory to
-            // convert JSON object to Java object
-            .build()
-            .create()
+        fun init(context: Context) {
+            if (::instance.isInitialized) return
+            val appContext = context.applicationContext
+            instance = AuthStore(appContext)
+        }
     }
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val masterKey = MasterKey.Builder(this)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
+        AuthStore.init(this)
 
-        val sharedPreferences: SharedPreferences = EncryptedSharedPreferences.create(this,
-            "secret_shared_prefs",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
         //val savedKey = "up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"//sharedPreferences.getString("apikey", "up:yeah:404")
-        val savedKey = sharedPreferences.getString("apiKey", "up:yeah:404")
+        val savedKey = AuthStore.instance.prefs.getString("apiKey", "up:yeah:404")
 
         setContent {
             /*val navController = rememberNavController()
@@ -107,13 +95,20 @@ class MainActivity : ComponentActivity() {
                 composable("HomeScreen") { HomeScreen(MainViewModel(savedKey!!))}
                 /*...*/
             }*/
+            var theme by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(3.seconds)
+                    theme = true
+                }
+            }
             UpBudgetAppTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    navMain(initKey = savedKey!!, prefs = sharedPreferences)
+                    navMain(initKey = savedKey!!, prefs = AuthStore.instance.prefs)
                     //navController.navigate("buffer")
                     //Buffer(BufferViewModel(savedKey!!), sharedPreferences)
                     //HomeScreen()
@@ -131,52 +126,80 @@ data class Account(
     val balance: Float,
     val currency: String
 )
+
+data class TransactionResponse(
+    val data: List<Transaction>,
+)
+
 data class Transaction(
     val id: String,
     val amount: Float,
     val currency: String,
     val payee: String,
-    val payeeLong:String,
-    val description:String,
+    val payeeLong: String,
+    val description: String,
     val accountId: String,
     val categoryId: String,
     val parentCategoryId: String,
-    val tag:List<String>
+    val tag: List<String>
 )
+
 data class Category(
-    val name:String,
-    val total:Float,
-    val parentId:String,
-    val isParent:Boolean,
-    val transactions:List<String>
+    val name: String,
+    val total: Float,
+    val parentId: String,
+    val isParent: Boolean,
+    val transactions: List<String>
 )
+
 data class Passthrough(
-    val accounts:List<Account>,
-    val transactions:List<Transaction>,
-    val categories:List<Category>,
-    var currentAccount:String
+    val accounts: List<Account>,
+    val transactions: List<Transaction>,
+    val categories: List<Category>,
+    var currentAccount: String
 )
 
 @Composable
-fun Buffer(viewModel: BufferViewModel = viewModel(), prefs: SharedPreferences, navController: NavHostController){
+fun Buffer(
+    viewModel: BufferViewModel = viewModel(),
+    prefs: SharedPreferences,
+    navController: NavHostController
+) {
     Log.e("started buffer", "HERE")
-    while(viewModel.getStatus()==0)Thread.sleep(10)
-    if(viewModel.getStatus()==200){
-        navController.navigate(Paths.Home.Path+"/${viewModel.getKey()}")
+    while (viewModel.getStatus() == 0) Thread.sleep(10)
+    if (viewModel.getStatus() == 200) {
+        navController.navigate(Paths.Home.Path + "/${viewModel.getKey()}")
         //HomeScreen(MainViewModel(viewModel.getKey()))
+    } else navController.navigate(Paths.Login.Path) {
+        navOptions {
+            popUpTo(Paths.Buffer.Path) {
+                inclusive = true
+            }
+        }
     }
-    else navController.navigate(Paths.Login.Path)//loginCard(prefs=prefs)
 }
 
 @Composable
-fun navMain(initKey: String, prefs: SharedPreferences){
+fun navMain(initKey: String, prefs: SharedPreferences) {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = Paths.Buffer.Path) {
-        composable(Paths.Buffer.Path) { Buffer(BufferViewModel(initKey!!), prefs = prefs, navController = navController) }
+        composable(Paths.Buffer.Path) {
+            val viewModel: BufferViewModel = viewModel(
+                it, // Make sure ViewModel is dispose when UI is removed.
+                factory = BufferViewModel,
+                extras = BufferViewModel.creationExtras(apiKey = initKey)
+            )
+            Buffer(
+                viewModel,
+                prefs = prefs,
+                navController = navController
+            )
+        }
         composable(Paths.Login.Path) { loginCard(prefs = prefs, navController = navController) }
-        composable(Paths.Home.Path+"/{id}") { navBackStack ->
+        composable(Paths.Home.Path + "/{id}") { navBackStack ->
             val passedKey = navBackStack.arguments?.getString("id")
-            HomeScreen(MainViewModel(passedKey!!), prefs, navController) }
+            HomeScreen(MainViewModel(passedKey!!), prefs, navController)
+        }
         /*...*/
     }
 }

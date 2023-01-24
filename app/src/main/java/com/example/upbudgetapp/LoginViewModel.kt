@@ -3,14 +3,15 @@ package com.example.upbudgetapp
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.example.upbudgetapp.api.RetrofitHelper
+import com.example.upbudgetapp.api.UpApi
+import kotlinx.coroutines.*
 import java.net.HttpURLConnection
 import java.net.URL
 
-class LoginViewModel() : ViewModel() {
+class LoginViewModel(
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+) : ViewModel() {
 
     private var savedKey = ""
     private var responseCode=0
