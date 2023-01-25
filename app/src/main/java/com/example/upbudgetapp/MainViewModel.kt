@@ -3,6 +3,8 @@ package com.example.upbudgetapp
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.upbudgetapp.api.RetrofitHelper
+import com.example.upbudgetapp.api.UpApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -84,7 +86,7 @@ class MainViewModel: ViewModel {
     suspend fun populateAccounts2(passedKey:String) = withContext(Dispatchers.Default){
         val map = HashMap<String, String>()
         map["Authorization"] = passedKey
-        val accountsx = upApi.getAccounts(map)
+        val accountsx = upApi.getAccounts()
         val delimiter = "}, {type=accounts,"
         val delimiter2 = "data=[{type=accounts,"
         val delimiter3 = "}}],"
@@ -152,8 +154,10 @@ class MainViewModel: ViewModel {
     suspend fun populateTransactions2(passedKey:String) = withContext(Dispatchers.Default) {
         // Heavy work
         val map = HashMap<String, String>()
-        map["Authorization"] = "Bearer "+passedKey
-        val transactionsx = upApi.getTransactions(map)
+
+        map["Authorization"] = "Bearer "+passedKey//"Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
+        val transactionsx = upApi.getTransactions()
+
         val delimiter = "}, {type=transactions,"
         val delimiter2 = "data=[{type=transactions,"
         val delimiter3 = "}}],"

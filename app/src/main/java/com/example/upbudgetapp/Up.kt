@@ -1,12 +1,13 @@
-package com.example.upbudgetapp
+package com.example.upbudgetapp.api
 
+import com.example.upbudgetapp.AuthStore
 import okhttp3.Interceptor
 import okhttp3.Response
 
 object UpAuth : Interceptor {
 
-    // total hack for now, should be private later
-    var token: String = ""
+    private val token: String? get() =
+        AuthStore.instance.prefs.getString("apiKey", null)
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val newRequest = chain.request().newBuilder()
