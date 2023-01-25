@@ -44,7 +44,7 @@ class MainViewModel: ViewModel {
         val http: HttpURLConnection = getAccount.openConnection() as HttpURLConnection
         http.setRequestProperty(
             "Authorization",
-            "Bearer $passedKey"//up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
+            "Bearer $passedKey"
         )
         try {
             val result = http.content as InputStream
@@ -113,7 +113,7 @@ class MainViewModel: ViewModel {
         val http: HttpURLConnection = getAccount.openConnection() as HttpURLConnection
         http.setRequestProperty(
             "Authorization",
-            "Bearer "+passedKey//up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
+            "Bearer "+passedKey
         )
         try {
             val result = http.content as InputStream
@@ -154,8 +154,10 @@ class MainViewModel: ViewModel {
     suspend fun populateTransactions2(passedKey:String) = withContext(Dispatchers.Default) {
         // Heavy work
         val map = HashMap<String, String>()
+
         map["Authorization"] = "Bearer "+passedKey//"Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
         val transactionsx = upApi.getTransactions()
+
         val delimiter = "}, {type=transactions,"
         val delimiter2 = "data=[{type=transactions,"
         val delimiter3 = "}}],"

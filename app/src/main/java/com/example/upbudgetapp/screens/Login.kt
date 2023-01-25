@@ -4,10 +4,7 @@ import android.content.SharedPreferences
 import android.text.Layout
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
@@ -55,6 +52,7 @@ fun loginCard(
                 .clip(CircleShape)
                 .border(1.5.dp, MaterialTheme.colors.secondary, CircleShape)
         )
+        Spacer(modifier = Modifier.height(20.dp))
         Text("Enter your api key")
         TextField(
             value = text,

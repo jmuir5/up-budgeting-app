@@ -76,16 +76,19 @@ class AuthStore private constructor(context: Context) {
             val appContext = context.applicationContext
             instance = AuthStore(appContext)
         }
+
     }
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         AuthStore.init(this)
 
         //val savedKey = "up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"//sharedPreferences.getString("apikey", "up:yeah:404")
         val savedKey = AuthStore.instance.prefs.getString("apiKey", "up:yeah:404")
+
 
         setContent {
             /*val navController = rememberNavController()
