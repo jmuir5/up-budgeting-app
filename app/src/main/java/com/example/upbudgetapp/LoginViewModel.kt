@@ -28,7 +28,7 @@ class LoginViewModel() : ViewModel() {
         val http: HttpURLConnection = getAccount.openConnection() as HttpURLConnection
         http.setRequestProperty(
             "Authorization",
-            "Bearer "+passedKey//up:yeah:GFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"//up:yeah:404"
+            "Bearer "+passedKey
         )
         try {
             responseCode = http.responseCode.toInt()
@@ -40,8 +40,9 @@ class LoginViewModel() : ViewModel() {
     suspend fun attemptLogin(apiKey:String) = withContext(Dispatchers.IO){
         /*Log.e("head", "Authorisation: Bearer $apiKey")
         val map = HashMap<String, String>()
-        map["Authorization"] = "Bearer "+apiKey//"Bearer up:yeah:QFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"
+        map["Authorization"] = "Bearer "+apiKey
         Log.e("map",  map.toString())
+
 
         val pingtest = async{
             Log.e("request", upApi.ping(map/*"Authorisation: Bearer $apiKey"*/).headers().toString())
@@ -51,7 +52,7 @@ class LoginViewModel() : ViewModel() {
             val http: HttpURLConnection = getAccount.openConnection() as HttpURLConnection
             http.setRequestProperty(
                 "Authorization",
-                "Bearer "+apiKey//up:yeah:GFGul2kGiQLYl97cT2LzvncSL5tsCdNvaDOoLmrbW9uWUmxF0uwAYl77atL5CT3cuZed8qcTKIhaI6nTrM1Jax1Vab2U86yzoqJeWwgqOOEhEY5QtHZj8k206TfbvNi3"//up:yeah:404"
+                "Bearer "+apiKey
             )
             try {
                 responseCode = http.responseCode.toInt()
