@@ -1,12 +1,7 @@
 package com.example.upbudgetapp
 
 import kotlinx.serialization.*
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
-import java.math.BigInteger
+
 
 @Serializable
 class AccountResponse(
@@ -182,41 +177,41 @@ class Tags(
     val links:TagLinks
 )
 
-@Serializable //done
+@Serializable 
 class Tag(
     val type:String,
     val id:String
 )
 
-@Serializable //done
+@Serializable 
 class TagLinks(
     val self:String
 )
 
-@Serializable //done
+@Serializable 
 class MoneyObject(
     val currencyCode:String,
     val value:String,
     val valueInBaseUnits:Long
 )
 
-@Serializable //done
+@Serializable 
 class SelfLinks(
     val self:String
 )
 
-@Serializable  //done
+@Serializable  
 class SelfRelLinks(
     val self:String,
     val related:String?=null
 )
 
-@Serializable //done
+@Serializable 
 class RelLinks(
     val related:String
 )
 
-@Serializable//done
+@Serializable
 class ObjectLinks(
     val prev:String?=null,
     val next:String?=null
