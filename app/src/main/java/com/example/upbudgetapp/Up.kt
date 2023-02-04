@@ -1,5 +1,6 @@
 package com.example.upbudgetapp.api
 
+import android.util.Log
 import com.example.upbudgetapp.AuthStore
 import okhttp3.Interceptor
 import okhttp3.Response
@@ -13,7 +14,6 @@ object UpAuth : Interceptor {
         val newRequest = chain.request().newBuilder()
             .addHeader("Authorization", "Bearer $token")
             .build()
-
         return chain.proceed(newRequest)
     }
 

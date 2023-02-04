@@ -31,7 +31,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.example.upbudgetapp.AccountResponse
 import com.example.upbudgetapp.Transaction
+import com.example.upbudgetapp.TransactionResponse
 import com.example.upbudgetapp.screens.HomeScreen
 import com.example.upbudgetapp.screens.loginCard
 import com.example.upbudgetapp.ui.theme.UpBudgetAppTheme
@@ -56,10 +58,10 @@ import java.net.URL
 
 interface UpApi {
     @GET("/api/v1/accounts")
-    suspend fun getAccounts(): Response<Any>
+    suspend fun getAccounts(): Response<AccountResponse>
 
     @GET("/api/v1/transactions")
-    suspend fun getTransactions(): Response<ApiTransactionResponse>
+    suspend fun getTransactions(): Response<TransactionResponse>
 
     @GET("/api/v1/util/ping")
     suspend fun ping(): Response<Any>

@@ -2,7 +2,10 @@ package com.example.upbudgetapp
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.lifecycle.viewmodel.MutableCreationExtras
 import com.example.upbudgetapp.api.RetrofitHelper
 import com.example.upbudgetapp.api.UpApi
 import kotlinx.coroutines.*
@@ -73,5 +76,20 @@ class LoginViewModel(
     }
     fun getKey():String{
         return savedKey
+    }
+    companion object : ViewModelProvider.Factory {
+        private val dispatchers = object : CreationExtras.Key<CoroutineDispatcher> {}
+
+        fun creationExtras(apiKey: CoroutineDispatcher): CreationExtras = MutableCreationExtras().apply {
+            set(dispatchers, apiKey)
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+            val initKey = requireNotNull(extras[dispatchers]) {
+                "No API key was passed to ViewModel Factory"
+            }
+            return LoginViewModel(initKey) as T
+        }
     }
 }

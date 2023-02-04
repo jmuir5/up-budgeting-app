@@ -2,12 +2,20 @@ package com.example.upbudgetapp
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.lifecycle.viewmodel.MutableCreationExtras
+import com.example.upbudgetapp.api.ApiTransactionResponse
 import com.example.upbudgetapp.api.RetrofitHelper
 import com.example.upbudgetapp.api.UpApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+import retrofit2.Response
 import java.io.BufferedReader
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -23,7 +31,7 @@ class MainViewModel: ViewModel {
     }
     private var accounts:MutableList<Account> = mutableListOf()
     private var transactions:MutableList<Transaction> = mutableListOf()
-    private var categories:MutableList<Category> = mutableListOf()
+    private var categories:MutableList<AppCategory> = mutableListOf()
     private val upApi: UpApi by lazy {
         RetrofitHelper.instance
     }
@@ -31,10 +39,13 @@ class MainViewModel: ViewModel {
 
 
     suspend fun massPopulate(passedKey:String) = withContext(Dispatchers.Default){
-        populateAccounts(passedKey) // old method, works fine
-        //populateAccounts2(passedKey) //retrofit method - doesnt work by its self
-        populateTransactions(passedKey) //old method, no longer needed, not going to delete till retrofit is 100%
-        //populateTransactions2(passedKey) //retrofit method, works
+        //populateAccounts(passedKey) // old method, works fine NLN
+        //populateAccounts2(passedKey) //retrofit method - doesnt work by its self NLN
+        populateAccounts3() //retrofit+serialisation method, WROKS
+        //populateTransactions(passedKey) //old method, no longer needed, not going to delete till retrofit is 100%, nln
+        //populateTransactions2(passedKey) //retrofit method, nln
+        populateTransactions3() //retrofit+serialisation method, WORKS
+        //populateTransactions4(passedKey)//old+serialisation method, nln
         populateCategories()
     }
     suspend fun populateAccounts(passedKey:String) = withContext(Dispatchers.Default) {
@@ -107,6 +118,29 @@ class MainViewModel: ViewModel {
         }
 
     }
+
+    suspend fun populateAccounts3() =withContext(Dispatchers.IO){
+        Log.e("populate transactions started", "here")
+        lateinit var accountsx: AccountResponse
+        try {
+            accountsx= upApi.getAccounts().body()!!
+        }catch (e:Exception){
+            Log.e("something went wrong", e.toString())
+        }
+        if (accountsx != null) {
+            for(i in accountsx.data){
+                accounts.add(
+                    Account(
+                        i.id,
+                        i.attributes.displayName,
+                        i.attributes.balance.valueInBaseUnits,
+                        i.attributes.balance.currencyCode,
+                    )
+                )
+            }
+        }
+    }
+
     suspend fun populateTransactions(passedKey:String) = withContext(Dispatchers.Default) {
         // Heavy work
         val getAccount = URL("https://api.up.com.au/api/v1/transactions")
@@ -183,12 +217,83 @@ class MainViewModel: ViewModel {
 
     }
 
+
+    suspend fun populateTransactions3() =withContext(Dispatchers.IO){
+        Log.e("populate transactions started", "here")
+        var transactionsx=upApi.getTransactions().body()
+        if (transactionsx != null) {
+            for(i in transactionsx.data){
+                val tags = mutableListOf<String>()
+                for(j in i.relationships.tags.data){
+                    tags.add(j.id)
+                }
+                transactions.add(
+                    Transaction(
+                        i.id,
+                        i.attributes.amount.valueInBaseUnits,
+                        i.attributes.amount.currencyCode,
+                        i.attributes.description,
+                        i.attributes.rawText,
+                        i.attributes.message,
+                        i.relationships.account.data.id,
+                        i.relationships.category?.data?.id,
+                        i.relationships.parentCategory?.data?.id,
+                        tags
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun populateTransactions4(passedKey:String) =withContext(Dispatchers.IO){
+        val getAccount = URL("https://api.up.com.au/api/v1/transactions")
+        val http: HttpURLConnection = getAccount.openConnection() as HttpURLConnection
+        http.setRequestProperty(
+            "Authorization",
+            "Bearer "+passedKey
+        )
+        try {
+            val result = http.content as InputStream
+            val resultReader = BufferedReader(result.reader())
+            val content: String
+            try {
+                content = resultReader.readText()
+            } finally {
+                resultReader.close()
+            }
+            var transacList = Json.decodeFromString<TransactionResponse>(content)
+            for(i in transacList.data){
+                val tags = mutableListOf<String>()
+                for(j in i.relationships.tags.data){
+                    tags.add(j.id)
+                }
+                transactions.add(
+                    Transaction(
+                        i.id,
+                        i.attributes.amount.valueInBaseUnits,
+                        i.attributes.amount.currencyCode,
+                        i.attributes.description,
+                        i.attributes.rawText,
+                        i.attributes.message,
+                        i.relationships.account.data.id,
+                        i.relationships.category?.data?.id,
+                        i.relationships.parentCategory?.data?.id,
+                        tags
+                    )
+                )
+            }
+        }finally {
+            http.disconnect()
+        }
+
+    }
+
     fun populateCategories(){
-        val catNames = mutableListOf<String>()
-        val catAmounts = mutableListOf<Float>()
+        val catNames = mutableListOf<String?>()
+        val catAmounts = mutableListOf<Long?>()
         val catId = mutableListOf<MutableList<String>>()
-        val catParent = mutableListOf<String>()
-        val catIsParent = mutableListOf<Boolean>()
+        val catParent = mutableListOf<String?>()
+        val catIsParent = mutableListOf<Boolean?>()
         for(i in transactions)
             if(i.parentCategoryId!="null"){
                 if(!catNames.contains(i.categoryId)) {
@@ -200,14 +305,14 @@ class MainViewModel: ViewModel {
                 }
                 if(catNames.contains(i.categoryId)){
                     val index = catNames.indexOf(i.categoryId)
-                    catAmounts[index]+=i.amount
+                    catAmounts[index] = catAmounts[index]?.plus(i.amount)
                     catId[index].add(i.id)
                 }
             }
         for(i in transactions){
             if(catNames.contains(i.categoryId)){
                 val index = catNames.indexOf(i.categoryId)
-                catAmounts[index]+=i.amount
+                catAmounts[index] = catAmounts[index]?.plus(i.amount)
                 catId[index].add(i.id)
             }
             if(!catNames.contains(i.categoryId)){
@@ -220,7 +325,7 @@ class MainViewModel: ViewModel {
             }
         }
         for(i in catNames.indices){
-            categories.add(Category(catNames[i], catAmounts[i], catParent[i], catIsParent[i], catId[i]))
+            categories.add(AppCategory(catNames[i], catAmounts[i], catParent[i], catIsParent[i], catId[i]))
         }
     }
 
@@ -252,11 +357,11 @@ class MainViewModel: ViewModel {
         delimiter = "\""
         return parts[1].split(delimiter)[0]
     }
-    fun getAccountBalance(content:String): Float {
+    fun getAccountBalance(content:String): Long {
         var delimiter = "\"valueInBaseUnits\":"
         val parts = content.split(delimiter)
         delimiter = "}"
-        return parts[1].split(delimiter)[0].toFloat()
+        return parts[1].split(delimiter)[0].toLong()
     }
     fun getAccountCurrency(content:String): String {
         var delimiter = "\"currencyCode\":\""
@@ -280,11 +385,11 @@ class MainViewModel: ViewModel {
 
         return parts[1].split(delimiter)[0]
     }
-    fun getAccountBalance2(content:String): Float {
+    fun getAccountBalance2(content:String): Long {
         var delimiter = "valueInBaseUnits="
         val parts = content.split(delimiter)
         delimiter = ".0}"
-        return parts[1].split(delimiter)[0].toFloat()
+        return parts[1].split(delimiter)[0].toLong()
     }
     fun getAccountCurrency2(content:String): String {
         var delimiter = "currencyCode="
@@ -295,13 +400,13 @@ class MainViewModel: ViewModel {
     }
 
     //get transaction functions for old method, kept untill retrofit is reliable or serialisation is implemented
-    fun getTransactionAmount(content:String): Float {
+    fun getTransactionAmount(content:String): Long {
         var delimiter = "\"amount\":"
         var parts = content.split(delimiter)
         delimiter = "valueInBaseUnits\":"
         parts = parts[1].split(delimiter)
         delimiter = "}"
-        return parts[1].split(delimiter)[0].toFloat()
+        return parts[1].split(delimiter)[0].toLong()
     }
     fun getTransactionCurrency(content:String): String {
         var delimiter = "\"amount\":"
@@ -382,13 +487,13 @@ class MainViewModel: ViewModel {
     }
 
     //get transaction functions for retrofit
-    fun getTransactionAmount2(content:String): Float {
+    fun getTransactionAmount2(content:String): Long {
         var delimiter = "amount="
         var parts = content.split(delimiter)
         delimiter = "valueInBaseUnits="
         parts = parts[1].split(delimiter)
         delimiter = ".0}"
-        return parts[1].split(delimiter)[0].toFloat()
+        return parts[1].split(delimiter)[0].toLong()
     }
     fun getTransactionCurrency2(content:String): String {
         var delimiter = "amount="
@@ -478,7 +583,23 @@ class MainViewModel: ViewModel {
     fun getTransactions():MutableList<Transaction>{
         return transactions
     }
-    fun getCategories():MutableList<Category>{
+    fun getCategories():MutableList<AppCategory>{
         return categories
+    }
+
+    companion object : ViewModelProvider.Factory {
+        private val API_INIT_KEY = object : CreationExtras.Key<String> {}
+
+        fun creationExtras(apiKey: String): CreationExtras = MutableCreationExtras().apply {
+            set(API_INIT_KEY, apiKey)
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+            val initKey = requireNotNull(extras[API_INIT_KEY]) {
+                "No API key was passed to ViewModel Factory"
+            }
+            return MainViewModel(initKey) as T
+        }
     }
 }

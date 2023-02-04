@@ -41,9 +41,8 @@ fun HomeScreen(viewModel: MainViewModel = viewModel(), prefs:SharedPreferences, 
                     }
                 }
             }
-        ) {//LaunchedEffect(true){viewModel.attemptLogin(state.toString())}){
+        ) {
             Text("logout")
-
         }
         LazyColumn() {
             items(viewModel.getAccounts()) { account ->
@@ -91,9 +90,9 @@ fun HeaderCard(info: Account, passthrough:Passthrough){
             Log.e("category", passthrough.categories.indices.toString())
             Log.e("category", passthrough.categories.toString())
             for(i in passthrough.categories){
-                if(i.isParent) {
+                if(i.isParent == true) {
                     var flag=0
-                    for (j in i.transactions){
+                    for (j in i.transactions!!){
                         for(k in passthrough2.transactions){
                             if(j==k.id&&k.accountId==info.id) flag=1
                         }
@@ -106,10 +105,10 @@ fun HeaderCard(info: Account, passthrough:Passthrough){
 }
 
 @Composable
-fun CategoryCard(info: Category, passthrough:Passthrough, level:Int){
+fun CategoryCard(info: AppCategory, passthrough:Passthrough, level:Int){
     val pad = 16+(level*8)
 
-    Column() {
+    Column {
         var isExpanded by remember { mutableStateOf(false) }
         Row(modifier = Modifier
             .padding(all = 8.dp)
@@ -127,15 +126,17 @@ fun CategoryCard(info: Category, passthrough:Passthrough, level:Int){
             )
             Spacer(modifier = Modifier.width(16.dp))
             var catName = info.name
-            if(info.name == "null")catName = "Uncategorised"
+            if(info.name == null)catName = "Uncategorised"
             Column() {
+                if (catName != null) {
+                    Text(
+                        text = catName,
+                        color = MaterialTheme.colors.secondaryVariant,
+                        style = MaterialTheme.typography.h6
+                    )
+                }
                 Text(
-                    text = catName,
-                    color = MaterialTheme.colors.secondaryVariant,
-                    style = MaterialTheme.typography.h6
-                )
-                Text(
-                    text = "\$${(info.total / 100)} AUD",
+                    text = "\$${(info.total?.div(100))} AUD",
                     color = MaterialTheme.colors.secondaryVariant,
                     style = MaterialTheme.typography.h6
                 )
@@ -143,11 +144,11 @@ fun CategoryCard(info: Category, passthrough:Passthrough, level:Int){
             Spacer(Modifier.weight(1f))
         }
         if (isExpanded) {
-            if (info.isParent && info.name != "null") {
+            if (info.isParent == true && info.name != null) {
                 for (i in passthrough.categories) {
-                    if (!i.isParent) {
+                    if (!i.isParent!! && i.parentId==info.name) {
                         var flag=0
-                        for (j in i.transactions){
+                        for (j in i.transactions!!){
                             for(k in passthrough.transactions){
                                 if(j==k.id&&k.accountId==passthrough.currentAccount) flag=1
                             }
@@ -189,14 +190,16 @@ fun TransactionCard(info: Transaction, passthrough:Passthrough, level:Int){
             Row(){
                 Column() {
                     var transacDesc = info.description
-                    if(transacDesc== "null") transacDesc = ""
+                    if(transacDesc== null) transacDesc = ""
+                    info.payee?.let {
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colors.secondaryVariant,
+                            style = MaterialTheme.typography.subtitle1
+                        )
+                    }
                     Text(
-                        text = info.payee,
-                        color = MaterialTheme.colors.secondaryVariant,
-                        style = MaterialTheme.typography.subtitle1
-                    )
-                    Text(
-                        text = (transacDesc),
+                        text = (transacDesc.toString()),
                         color = MaterialTheme.colors.secondaryVariant,
                         style = MaterialTheme.typography.subtitle1
                     )
@@ -230,81 +233,6 @@ fun TransactionCard(info: Transaction, passthrough:Passthrough, level:Int){
     }
 }
 
-@Composable
-fun GreetingCard(msg: Message) {
-    Row(modifier = Modifier.padding(all = 8.dp)) {
-        Image(
-            painter = painterResource(com.example.upbudgetapp.R.drawable.profile_picture),
-            contentDescription = "Contact profile picture",
-            modifier = Modifier
-                // Set image size to 40 dp
-                .size(40.dp)
-                // Clip image to be shaped as a circle
-                .clip(CircleShape)
-                .border(1.5.dp, MaterialTheme.colors.secondary, CircleShape)
-        )
-
-
-        // Add a horizontal space between the image and the column
-        Spacer(modifier = Modifier.width(8.dp))
-        var isExpanded by remember { mutableStateOf(false) }
-        /*val surfaceColor by animateColorAsState(
-            if (isExpanded) MaterialTheme.colors.primary else MaterialTheme.colors.surface,
-        )*/
-
-        // We toggle the isExpanded variable when we click on this Column
-        Column(modifier = Modifier.clickable { isExpanded = !isExpanded }) {
-            Text(text = msg.author,
-                color = MaterialTheme.colors.secondaryVariant,
-                style = MaterialTheme.typography.subtitle2
-            )
-
-            // Add a vertical space between the author and message texts
-            Spacer(modifier = Modifier.height(4.dp))
-            Surface(shape = MaterialTheme.shapes.medium, elevation = 1.dp) {
-                Text(
-                    text = msg.body,
-                    modifier = Modifier.padding(all = 4.dp),
-                    // If the message is expanded, we display all its content
-                    // otherwise we only display the first line
-                    maxLines = if (isExpanded) Int.MAX_VALUE else 1,
-                    style = MaterialTheme.typography.body2
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun Conversation(messages: List<Message>) {
-    LazyColumn {
-        items(messages) { message ->
-            GreetingCard(message)
-        }
-    }
-}
-
-
-@Preview(name="light mode",
-    showBackground = true)
-@Preview(showBackground = true,
-    uiMode = Configuration.UI_MODE_NIGHT_YES,
-    name = "dark mode")
-@Composable
-fun DefaultPreview() {
-    UpBudgetAppTheme {
-        val testMessage = Message("test", "message")
-        GreetingCard(testMessage)
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun PreviewConversation() {
-    UpBudgetAppTheme {
-        Conversation(SampleData.conversationSample)
-    }
-}
 
 @Preview(showBackground = true)
 @Composable

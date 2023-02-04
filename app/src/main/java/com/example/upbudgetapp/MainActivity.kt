@@ -39,7 +39,7 @@ import com.example.upbudgetapp.screens.HomeScreen
 import com.example.upbudgetapp.screens.loginCard
 import com.example.upbudgetapp.ui.theme.UpBudgetAppTheme
 import kotlinx.coroutines.*
-import kotlinx.serialization.Serializable
+//import kotlinx.serialization.Serializable
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
@@ -126,39 +126,37 @@ data class Message(val author: String, val body: String)
 data class Account(
     val id: String,
     val name: String,
-    val balance: Float,
+    val balance: Long,
     val currency: String
 )
 
-data class TransactionResponse(
-    val data: List<Transaction>,
-)
+
 
 data class Transaction(
     val id: String,
-    val amount: Float,
+    val amount: Long,
     val currency: String,
-    val payee: String,
-    val payeeLong: String,
-    val description: String,
-    val accountId: String,
-    val categoryId: String,
-    val parentCategoryId: String,
-    val tag: List<String>
+    val payee: String?=null,
+    val payeeLong: String?=null,
+    val description: String?=null,
+    val accountId: String?=null,
+    val categoryId: String?=null,
+    val parentCategoryId: String?=null,
+    val tag: List<String>?=null
 )
 
-data class Category(
-    val name: String,
-    val total: Float,
-    val parentId: String,
-    val isParent: Boolean,
-    val transactions: List<String>
+data class AppCategory(
+    val name: String?=null,
+    val total: Long?=null,
+    val parentId: String?=null,
+    val isParent: Boolean?=null,
+    val transactions: List<String>?=null
 )
 
 data class Passthrough(
     val accounts: List<Account>,
     val transactions: List<Transaction>,
-    val categories: List<Category>,
+    val categories: List<AppCategory>,
     var currentAccount: String
 )
 
@@ -199,9 +197,14 @@ fun navMain(initKey: String, prefs: SharedPreferences) {
             )
         }
         composable(Paths.Login.Path) { loginCard(prefs = prefs, navController = navController) }
-        composable(Paths.Home.Path + "/{id}") { navBackStack ->
-            val passedKey = navBackStack.arguments?.getString("id")
-            HomeScreen(MainViewModel(passedKey!!), prefs, navController)
+        composable(Paths.Home.Path + "/{id}") {
+            val viewModel: MainViewModel = viewModel(
+                it, // Make sure ViewModel is dispose when UI is removed.
+                factory = MainViewModel,
+                extras = MainViewModel.creationExtras(apiKey = it.arguments?.getString("id")!!)
+            )
+            val passedKey = it.arguments?.getString("id")
+            HomeScreen(viewModel, prefs, navController)
         }
         /*...*/
     }
